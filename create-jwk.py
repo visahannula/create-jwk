@@ -1,3 +1,5 @@
+#!/usr/bin/python
+
 import sys
 import json
 from jwcrypto import jwk
@@ -7,8 +9,12 @@ from datetime import date
 
 
 def generate_keys():
-    """ Generate and print keys. Return full key obj."""
-    key = jwk.JWK.generate(kty='RSA', size=4096)
+    """ Generate keys. Return full key obj."""
+    return jwk.JWK.generate(kty='RSA', size=4096)
+
+
+def print_key(key):
+    #TODO: Check which keys there actually are and only then print
 
     # exports the full key-pair
     key_full = key.export()
@@ -24,8 +30,33 @@ def generate_keys():
     print(f'Public part:\n{json.dumps(json.loads(key_public_part), indent=2)}')
     print('\n')
 
-    return key
 
+def print_keys(key_set):
+    if isinstance(key_set, list):
+        for key in key_set:
+            print_key(key)
+    else:
+        print_key(key_set)
+
+
+def read_key_from_file(filename):
+    with open(filename, 'r') as fn:
+        full_key_json = json.load(fn)
+
+    if full_key_json.get('keys', None):
+        print("Input is keyset.")
+        key_set = jwk.JWKSet()
+        key_set.import_keyset(**full_key_json)
+        full_key = key_set
+    else:
+        print("Input is not keyset.")
+        full_key = jwk.JWK(**full_key_json)
+
+    return full_key
+
+
+def create_JWK(key):
+    return jwk.JWKSet()
 
 def write_file(file_name, content):
     options = [ 
@@ -39,7 +70,7 @@ def write_file(file_name, content):
         priv = opt.get('private_key')
 
         with open(fname, 'w') as fn:
-            print(f'Writing to file: {fname}\n')
+            print(f'Writing to file: {fname}')
 
             if priv is None:
                 fn.write(str(content.export()))
@@ -47,25 +78,32 @@ def write_file(file_name, content):
                 fn.write(str(content.export(private_key=priv)))
 
 
-def parse_args(my_name = None, first=None, second=None):
+def parse_args(my_name = None, first=None, second=None) -> tuple:
     """Parse arguments and return filename"""
     print(f'Got arguments: {first}, {second}')
-    if second and first == '-o':
-        return second
-    else:
+    
+    if not second or (first != '-o' and first != '-i'):
         print(f'Unknown arguments.\n')
         sys.exit(1)
-
+    
+    return (second, first)
 
 def main():
-    file_name = parse_args(*sys.argv)
-    key_full = generate_keys()
-    write_file(file_name, key_full)
+    file_name, operation = (parse_args(*sys.argv))
+
+    if operation == '-o':
+        key_full = generate_keys()
+        print_keys(key_full)
+        write_file(file_name, key_full)
+    else:
+        key_full = read_key_from_file(file_name)
+        print_keys(key_full)
 
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print('Provide in or out and filename.')
+        print('Error: Provide in (-i) or out (-o) and filename.')
+        print('Usage: create-jwk.py [-i|-o] filename')
         sys.exit(1)
 
     main()
