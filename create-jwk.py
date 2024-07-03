@@ -1,12 +1,9 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 import sys
 import json
 from jwcrypto import jwk
 from datetime import date
-
-# TODO: implement read file
-
 
 def generate_keys():
     """ Generate keys. Return full key obj."""
@@ -14,21 +11,25 @@ def generate_keys():
 
 
 def print_key(key):
-    #TODO: Check which keys there actually are and only then print
-
     # exports the full key-pair
     key_full = key.export()
-    # export private key
-    key_private_part = key.export(private_key=True)
-    # exports ONLY the public part.
-    key_public_part = key.export(private_key=False)
 
     print(f'Full key:\n{json.dumps(json.loads(key_full), indent=2)}')
     print('\n')
-    print(f'Private part:\n{json.dumps(json.loads(key_private_part), indent=2)}')
-    print('\n')
-    print(f'Public part:\n{json.dumps(json.loads(key_public_part), indent=2)}')
-    print('\n')
+    print(f'Has asymmetric private key: {key.has_private}')
+    print(f'Has asymmetric public key: {key.has_public}')
+
+    if (key.has_private):
+        # export private key
+        key_private_part = key.export(private_key=True)
+        print(f'Private part:\n{json.dumps(json.loads(key_private_part), indent=2)}')
+        print('\n')
+    if (key.has_public):
+        # exports ONLY the public part.
+        key_public_part = key.export(private_key=False)
+        print(f'Public part:\n{json.dumps(json.loads(key_public_part), indent=2)}')
+
+        print('\n')
 
 
 def print_keys(key_set):
@@ -58,34 +59,33 @@ def read_key_from_file(filename):
 def create_JWK(key):
     return jwk.JWKSet()
 
+
 def write_file(file_name, content):
-    options = [ 
-        { 'fname': 'full', 'private_key': None }, 
-        { 'fname': 'private', 'private_key': True},
-        { 'fname': 'public', 'private_key': False } 
-    ]
+    options = ['full', 'private', 'public']
 
     for opt in options:
-        fname = f'{file_name}_' + opt.get('fname') + '_' + str(date.today()) + '.json'
-        priv = opt.get('private_key')
+        fname = f'{file_name}_{opt}_{str(date.today())}.json'
 
         with open(fname, 'w') as fn:
             print(f'Writing to file: {fname}')
 
-            if priv is None:
-                fn.write(str(content.export()))
-            else:
-                fn.write(str(content.export(private_key=priv)))
+            match opt:
+                case "full":
+                    fn.write(str(content.export()))
+                case "private":
+                    fn.write(str(content.export_private()))
+                case "public":
+                    fn.write(str(content.export_public()))
 
 
 def parse_args(my_name = None, first=None, second=None) -> tuple:
     """Parse arguments and return filename"""
     print(f'Got arguments: {first}, {second}')
-    
+
     if not second or (first != '-o' and first != '-i'):
-        print(f'Unknown arguments.\n')
+        print("Unknown arguments.\n")
         sys.exit(1)
-    
+
     return (second, first)
 
 def main():
